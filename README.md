@@ -10,5 +10,6 @@ This is just an experiment to get going in rust and its macros. Hoping for feedb
 
 - This lacks an invalid state for now
 - The renaming of trait fns should result in more elegant/readable names
+- self.data modification in transition has a lot of duplicate code
 - ???
 - profit
