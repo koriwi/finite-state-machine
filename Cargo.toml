@@ -3,5 +3,8 @@ name = "finite-state-machine"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+verbose = []
+
 [dependencies]
 paste = "1.0.12"

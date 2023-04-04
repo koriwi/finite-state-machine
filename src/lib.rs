@@ -18,8 +18,8 @@ macro_rules! state_machine {
                 Invalid,
                 End
             }
-            #[derive(Clone)]
-            struct Data {
+            #[derive(Clone, Debug)]
+            struct Data { // make this external and have trait default
                 $($var_name:$var_type,)*
             }
             struct $name {
@@ -54,8 +54,16 @@ macro_rules! state_machine {
                             $(State::$state_name => match self.[<run _ $state_name:snake>]() {
                                 $([<$state_name Events>]::$event => {
                                     match self.[<$state_name:snake _ $event:snake>]() {
-                                        Ok(_) => self.state = State::$possible_target_state,
-                                        Err(_) => self.state = State::Invalid
+                                        Ok(_) => {
+                                            #[cfg(feature = "verbose")]
+                                            println!("{} + {} -> {}", stringify!($state_name), stringify!($event), stringify!($possible_target_state));
+                                            self.state = State::$possible_target_state
+                                        },
+                                        Err(_) => {
+                                            #[cfg(feature = "verbose")]
+                                            println!("{} + Impossible -> {}", stringify!($state_name), stringify!(Invalid));
+                                            self.state = State::Invalid
+                                        }
                                     }
 
                                 },)*
