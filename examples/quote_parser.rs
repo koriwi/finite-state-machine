@@ -26,6 +26,17 @@ state_machine!(
 );
 
 impl QuoteParser {
+    fn reset(&mut self) {
+        self.data.char = None;
+        self.data.index = 0;
+        self.data.buffer = String::new();
+        self.data.quote = None;
+        self.data.text = String::new();
+    }
+    fn next_char(&mut self) {
+        self.data.index += 1;
+        self.data.char = self.data.text.chars().nth(self.data.index);
+    }
     fn new(quotes: Vec<char>) -> QuoteParser {
         QuoteParser {
             data: Data {
@@ -40,48 +51,47 @@ impl QuoteParser {
             state: State::Start,
         }
     }
-    fn parse(&mut self, text: String) -> Data {
+    fn parse(&mut self, text: String) -> Result<Data, Data> {
         self.data.text = text;
         self.run()
     }
 }
 
 impl Transitions for QuoteParser {
-    fn start_begin(&mut self) {
-        self.data.char = self.data.text.chars().nth(self.data.index);
+    fn all_impossible(&mut self) {}
+    fn start_begin(&mut self) -> Result<(), String> {
+        self.next_char();
+        Ok(())
     }
-    fn left_quote_end_of_text(&mut self) {
-        self.data.char = None;
-        self.data.index = 0;
-        self.data.buffer = String::new();
-        self.data.quote = None;
-        self.data.text = String::new();
+    fn left_quote_end_of_text(&mut self) -> Result<(), String> {
+        self.reset();
+        Ok(())
     }
-    fn right_quote_end_of_text(&mut self) {
-        self.left_quote_end_of_text();
+    fn right_quote_end_of_text(&mut self) -> Result<(), String> {
+        self.reset();
+        Ok(())
     }
-    fn left_quote_found_quote(&mut self) {
-        let mut chars = self.data.text.chars();
-        let char = chars.nth(self.data.index).expect("impossible");
-        self.data.quote = Some(char);
-        self.data.index += 1;
-        self.data.char = chars.next();
+    fn left_quote_found_quote(&mut self) -> Result<(), String> {
+        self.data.quote = self.data.char;
+        self.next_char();
+        Ok(())
     }
-    fn left_quote_no_quote(&mut self) {
-        self.data.index += 1;
-        self.data.char = self.data.text.chars().nth(self.data.index);
+    fn left_quote_no_quote(&mut self) -> Result<(), String> {
+        self.next_char();
+        Ok(())
     }
-    fn right_quote_found_quote(&mut self) {
+    fn right_quote_found_quote(&mut self) -> Result<(), String> {
         self.data.found.push(self.data.buffer.clone());
         self.data.buffer = String::new();
         self.data.quote = None;
-        self.data.index += 1;
-        self.data.char = self.data.text.chars().nth(self.data.index);
+        self.next_char();
+        Ok(())
     }
-    fn right_quote_no_quote(&mut self) {
-        self.data.buffer.push(self.data.char.expect("impossible"));
-        self.data.index += 1;
-        self.data.char = self.data.text.chars().nth(self.data.index);
+    fn right_quote_no_quote(&mut self) -> Result<(), String> {
+        let char = self.data.char.ok_or(String::from("char is gone"))?;
+        self.data.buffer.push(char);
+        self.next_char();
+        Ok(())
     }
 }
 
@@ -102,7 +112,7 @@ impl StateActions for QuoteParser {
     fn run_right_quote(&self) -> RightQuoteEvents {
         let quote = match self.data.quote {
             Some(q) => q,
-            None => panic!("impossible"),
+            None => return RightQuoteEvents::Impossible,
         };
         let char = match self.data.char {
             Some(c) => c,
@@ -120,5 +130,8 @@ fn main() {
     let input = "Hello 'World' from \"macro_rules!\"".to_string();
     println!("Finding quoted chars in: {}", input);
     let result = parser.parse(input);
-    println!("{:?}", result.found);
+    match result {
+        Ok(data) => println!("Found {:?}", data.found),
+        Err(data) => println!("Error, but found {:?}", data.found),
+    };
 }

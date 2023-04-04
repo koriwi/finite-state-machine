@@ -15,6 +15,7 @@ macro_rules! state_machine {
             $(
                 $state_name,
             )*
+                Invalid,
                 End
             }
             #[derive(Clone)]
@@ -33,7 +34,8 @@ macro_rules! state_machine {
 
             $(
                 enum [<$state_name Events>] {
-                    $($event),*
+                    $($event,)*
+                    Impossible
                 }
             )*
             trait StateActions {
@@ -42,22 +44,27 @@ macro_rules! state_machine {
             )*
             }
             trait Transitions {
-                $($(fn [<$state_name:snake _ $event:snake>](&mut self);)*)*
+                $($(fn [<$state_name:snake _ $event:snake>](&mut self) -> Result<(),String>;)*)*
+                fn all_impossible(&mut self);
             }
             impl $name {
-                fn run(&mut self) -> Data {
+                fn run(&mut self) -> Result<Data, Data> {
                     loop {
                         match &self.state {
                             $(State::$state_name => match self.[<run _ $state_name:snake>]() {
                                 $([<$state_name Events>]::$event => {
-                                    self.[<$state_name:snake _ $event:snake>]();
-                                    self.state = State::$possible_target_state;
+                                    match self.[<$state_name:snake _ $event:snake>]() {
+                                        Ok(_) => self.state = State::$possible_target_state,
+                                        Err(_) => self.state = State::Invalid
+                                    }
+
                                 },)*
+                                [<$state_name Events>]::Impossible => {self.all_impossible();}
                             } ,)*
-                            State::End => {break}
+                            State::End => return Ok(self.data.clone()),
+                            State::Invalid => return Err(self.data.clone())
                         };
-                    }
-                    self.data.clone()
+                    };
                 }
             }
         }
