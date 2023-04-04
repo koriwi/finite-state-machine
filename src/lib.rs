@@ -42,7 +42,7 @@ macro_rules! state_machine {
                 fn all_impossible(&mut self);
             }
             impl $name {
-                fn run(&mut self) -> Result<Data, Data> {
+                fn run(&mut self) -> Result<Data, String> {
                     loop {
                         match &self.state {
                             $(State::$state_name => match self.[<run _ $state_name:snake>]() {
@@ -53,10 +53,11 @@ macro_rules! state_machine {
                                             println!("{} + {} -> {}", stringify!($state_name), stringify!($event), stringify!($possible_target_state));
                                             self.state = State::$possible_target_state
                                         },
-                                        Err(_) => {
+                                        Err(message) => {
                                             #[cfg(feature = "verbose")]
-                                            println!("{} + Impossible -> {}", stringify!($state_name), stringify!(Invalid));
-                                            self.state = State::Invalid
+                                            println!("{} + {} + error({}) -> {}", stringify!($state_name), stringify!($event), message, stringify!(Invalid));
+                                            self.state = State::Invalid;
+                                            return Err(message);
                                         }
                                     }
 
@@ -64,7 +65,7 @@ macro_rules! state_machine {
                                 [<$state_name Events>]::Impossible => {self.all_impossible();}
                             } ,)*
                             State::End => return Ok(self.data.clone()),
-                            State::Invalid => return Err(self.data.clone())
+                            State::Invalid => return Err("invalid without message".to_string())
                         };
                     };
                 }

@@ -54,7 +54,7 @@ impl QuoteParser {
             state: State::Start,
         }
     }
-    fn parse(&mut self, text: String) -> Result<Data, Data> {
+    fn parse(&mut self, text: String) -> Result<Data, String> {
         self.data.text = text;
         self.run()
     }
@@ -135,6 +135,6 @@ fn main() {
     let result = parser.parse(input);
     match result {
         Ok(data) => println!("Found {:?}", data.found),
-        Err(data) => println!("Error, but found {:?}", data.found),
+        Err(message) => println!("Error, but found {:?}", message),
     };
 }

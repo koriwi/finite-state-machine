@@ -8,8 +8,5 @@ This is just an experiment to get going in rust and its macros. Hoping for feedb
 
 ## ToDo
 
-- This lacks an invalid state for now
+- Improve invalid state logging in verbose
 - The renaming of trait fns should result in more elegant/readable names
-- example(quote_parser): self.data modification in transition has a lot of duplicate code
-- ???
-- profit

@@ -84,7 +84,30 @@ impl CSVParser {
             state: State::Start,
         }
     }
-    fn parse(&mut self, text: String) -> Result<Data, Data> {
+    fn push_field_to_row(&mut self) -> Result<(), String> {
+        let field = self.data.field_buffer.clone();
+        self.data.field_buffer = String::new();
+        self.last_row()?.push(field);
+        Ok(())
+    }
+    fn last_row(&mut self) -> Result<&mut CSVRow, String> {
+        self.data
+            .rows
+            .last_mut()
+            .ok_or("last_row is undefined, impossible".to_string())
+    }
+    fn last_column(&mut self) -> Result<&mut String, String> {
+        self.data
+            .column_names
+            .last_mut()
+            .ok_or("last_column is undefined, impossible".to_string())
+    }
+    fn store_char_in_field_buffer(&mut self) -> Result<(), String> {
+        let char = self.data.char.ok_or("char cannot disappear".to_string())?;
+        self.data.field_buffer.push(char);
+        Ok(())
+    }
+    fn parse(&mut self, text: String) -> Result<Data, String> {
         self.data.text = text;
         self.run()?;
         Ok(self.data.clone())
@@ -104,11 +127,7 @@ impl Transitions for CSVParser {
     }
     fn find_header_delimiter_found_else(&mut self) -> Result<(), String> {
         let char = self.data.char.ok_or("char cannot disappear".to_string())?;
-        let last_column = self
-            .data
-            .column_names
-            .last_mut()
-            .ok_or("last_column is undefined, impossible".to_string())?;
+        let last_column = self.last_column()?;
         last_column.push(char);
         self.next_char();
         Ok(())
@@ -127,15 +146,7 @@ impl Transitions for CSVParser {
         Ok(())
     }
     fn find_header_right_quote_found_else(&mut self) -> Result<(), String> {
-        let char = self.data.char.ok_or("char cannot disappear".to_string())?;
-        let last_column = self
-            .data
-            .column_names
-            .last_mut()
-            .ok_or("last_column is undefined, impossible".to_string())?;
-        last_column.push(char);
-        self.next_char();
-        Ok(())
+        self.find_header_delimiter_found_else()
     }
     fn find_header_right_quote_found_right_quote(&mut self) -> Result<(), String> {
         self.data.quote = None;
@@ -164,29 +175,19 @@ impl Transitions for CSVParser {
         Ok(())
     }
     fn find_body_delimiter_found_else(&mut self) -> Result<(), String> {
-        let char = self.data.char.ok_or("char cannot disappear".to_string())?;
-        self.data.field_buffer.push(char);
+        self.store_char_in_field_buffer()?;
         self.next_char();
         Ok(())
     }
     fn find_body_delimiter_found_delimiter(&mut self) -> Result<(), String> {
-        let last_row = self
-            .data
-            .rows
-            .last_mut()
-            .ok_or("last_row is undefined, impossible".to_string())?;
-        last_row.push(self.data.field_buffer.clone());
+        self.push_field_to_row()?;
         self.data.field_buffer = String::new();
         self.next_char();
         Ok(())
     }
     fn find_body_delimiter_empty(&mut self) -> Result<(), String> {
-        let last_row = self
-            .data
-            .rows
-            .last_mut()
-            .ok_or("last_row is undefined, impossible".to_string())?;
-        last_row.push(self.data.field_buffer.clone());
+        self.push_field_to_row()?;
+        let last_row = self.last_row()?;
         if last_row.len() != self.data.column_names.len() {
             return Err("Row length does not match column length".to_string());
         }
@@ -204,8 +205,7 @@ impl Transitions for CSVParser {
         Ok(())
     }
     fn find_body_right_quote_found_else(&mut self) -> Result<(), String> {
-        let char = self.data.char.ok_or("char cannot disappear".to_string())?;
-        self.data.field_buffer.push(char);
+        self.store_char_in_field_buffer()?;
         self.next_char();
         Ok(())
     }
