@@ -119,7 +119,11 @@ impl CSVParser {
 }
 
 impl Transitions for CSVParser {
-    fn all_impossible(&mut self) {}
+    fn find_body_delimiter_impossible(&mut self) {}
+    fn find_body_right_quote_impossible(&mut self) {}
+    fn find_header_delimiter_impossible(&mut self) {}
+    fn find_header_right_quote_impossible(&mut self) {}
+    fn start_impossible(&mut self) {}
     fn start_begin(&mut self) -> Result<(), String> {
         self.data.char = self.data.text.chars().nth(self.data.index);
         self.data.column_names = vec![String::new()];

@@ -61,7 +61,9 @@ impl QuoteParser {
 }
 
 impl Transitions for QuoteParser {
-    fn all_impossible(&mut self) {}
+    fn left_quote_impossible(&mut self) {}
+    fn right_quote_impossible(&mut self) {}
+    fn start_impossible(&mut self) {}
     fn start_begin(&mut self) -> Result<(), String> {
         self.data.char = self.data.text.chars().nth(self.data.index);
         Ok(())

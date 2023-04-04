@@ -39,7 +39,7 @@ macro_rules! state_machine {
             }
             trait Transitions {
                 $($(fn [<$state_name:snake _ $event:snake>](&mut self) -> Result<(),String>;)*)*
-                fn all_impossible(&mut self);
+                $(fn [<$state_name:snake _ impossible>](&mut self);)*
             }
             impl $name {
                 fn run(&mut self) -> Result<Data, String> {
@@ -61,7 +61,12 @@ macro_rules! state_machine {
                                     }
 
                                 },)*
-                                [<$state_name Events>]::Impossible => {self.all_impossible();}
+                                [<$state_name Events>]::Impossible => {
+                                    self.[<$state_name:snake _ impossible>]();
+                                    #[cfg(feature = "verbose")]
+                                    println!("{} + impossible -> {}", stringify!($state_name), stringify!(Invalid));
+                                    self.state = State::Invalid("impossible".to_owned());
+                                }
                             } ,)*
                             State::End => return Ok(self.data.clone()),
                             State::Invalid(message) => return Err(message.to_owned())
