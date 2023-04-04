@@ -9,6 +9,7 @@ macro_rules! state_machine {
         ),*
     ) => {
         paste::paste!{
+        mod $name {
             enum State {
             $(
                 $state_name,
@@ -16,7 +17,7 @@ macro_rules! state_machine {
                 Invalid(String),
                 End
             }
-            struct $name {
+            struct Machine {
                 state: State,
                 data: $data,
             }
@@ -32,22 +33,24 @@ macro_rules! state_machine {
                     Impossible
                 }
             )*
-            trait StateActions {
+            trait Deciders {
             $(
-                fn [<run _ $state_name:snake>](&self) -> [<$state_name Events>];
+                fn [<$state_name:snake>](&self) -> [<$state_name Events>];
             )*
             }
-            trait Transitions {
-                $($(fn [<$state_name:snake _ $event:snake>](&mut self) -> Result<(),String>;)*)*
-                $(fn [<$state_name:snake _ impossible>](&mut self);)*
-            }
+            $(
+                trait [<$state_name Transitions>] {
+                    $(fn [<$event:snake>](&mut self) -> Result<(),String>;)*
+                    fn impossible(&mut self);
+                }
+            )*
             impl $name {
-                fn run(&mut self) -> Result<Data, String> {
+                fn run(&mut self) -> Result<$data, String> {
                     loop {
                         match &self.state {
                             $(State::$state_name => match self.[<run _ $state_name:snake>]() {
                                 $([<$state_name Events>]::$event => {
-                                    match self.[<$state_name:snake _ $event:snake>]() {
+                                    match <[<$state_name Transitions>]>::[<$event:snake>](self) {
                                         Ok(_) => {
                                             #[cfg(feature = "verbose")]
                                             println!("{} + {} -> {}", stringify!($state_name), stringify!($event), stringify!($possible_target_state));
@@ -62,7 +65,7 @@ macro_rules! state_machine {
 
                                 },)*
                                 [<$state_name Events>]::Impossible => {
-                                    self.[<$state_name:snake _ impossible>]();
+                                    <[<$state_name Transitions>]>::impossible(self);
                                     #[cfg(feature = "verbose")]
                                     println!("{} + impossible -> {}", stringify!($state_name), stringify!(Invalid));
                                     self.state = State::Invalid("impossible".to_owned());
@@ -74,6 +77,7 @@ macro_rules! state_machine {
                     };
                 }
             }
+        }
         }
     };
 }
