@@ -13,7 +13,7 @@ macro_rules! state_machine {
             $(
                 $state_name,
             )*
-                Invalid,
+                Invalid(String),
                 End
             }
             struct $name {
@@ -56,8 +56,7 @@ macro_rules! state_machine {
                                         Err(message) => {
                                             #[cfg(feature = "verbose")]
                                             println!("{} + {} + error({}) -> {}", stringify!($state_name), stringify!($event), message, stringify!(Invalid));
-                                            self.state = State::Invalid;
-                                            return Err(message);
+                                            self.state = State::Invalid(message);
                                         }
                                     }
 
@@ -65,7 +64,7 @@ macro_rules! state_machine {
                                 [<$state_name Events>]::Impossible => {self.all_impossible();}
                             } ,)*
                             State::End => return Ok(self.data.clone()),
-                            State::Invalid => return Err("invalid without message".to_string())
+                            State::Invalid(message) => return Err(message.to_owned())
                         };
                     };
                 }
