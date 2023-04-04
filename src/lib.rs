@@ -1,9 +1,7 @@
 #[macro_export]
 macro_rules! state_machine {
     (
-        $name:ident{
-            $($var_name:tt : $var_type:ty),*
-        };
+        $name:ident($data:ident);
         $(
             $state_name:ident {
                 $($event:ident => $possible_target_state:ident),*
@@ -18,13 +16,9 @@ macro_rules! state_machine {
                 Invalid,
                 End
             }
-            #[derive(Clone, Debug)]
-            struct Data { // make this external and have trait default
-                $($var_name:$var_type,)*
-            }
             struct $name {
                 state: State,
-                data: Data
+                data: $data,
             }
             enum Events {
             $(

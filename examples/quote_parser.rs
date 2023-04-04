@@ -1,15 +1,18 @@
 use finite_state_machine::state_machine;
 
+#[derive(Debug, Clone, PartialEq)]
+struct Data {
+    buffer: String,
+    quotes: Vec<char>,
+    text: String,
+    char: Option<char>,
+    found: Vec<String>,
+    quote: Option<char>,
+    index: usize,
+}
+
 state_machine!(
-    QuoteParser {
-        buffer: String,
-        quotes: Vec<char>,
-        text: String,
-        char: Option<char>,
-        found: Vec<String>,
-        quote: Option<char>,
-        index: usize
-    };
+    QuoteParser(Data);
     Start {
         Begin => LeftQuote
     },

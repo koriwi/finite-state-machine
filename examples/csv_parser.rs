@@ -27,17 +27,20 @@ impl CSVRow {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+struct Data {
+    index: usize,
+    char: Option<char>,
+    quote: Option<char>,
+    text: String,
+    delimiter: char,
+    column_names: Vec<String>,
+    field_buffer: String,
+    rows: Vec<CSVRow>,
+}
+
 state_machine!(
-    CSVParser {
-        index: usize,
-        char: Option<char>,
-        quote: Option<char>,
-        text: String,
-        delimiter: char,
-        column_names: Vec<String>,
-        field_buffer: String,
-        rows: Vec<CSVRow>
-    };
+    CSVParser(Data);
     Start {
         Begin => FindHeaderDelimiter
     },
