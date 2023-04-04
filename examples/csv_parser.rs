@@ -274,12 +274,14 @@ impl StateActions for CSVParser {
 
 fn main() {
     let mut csv_parser = CSVParser::new(',');
-    let result = csv_parser.parse("'a',\"b\",c'b'\n1,2,3".to_string());
+    let text = "'a',\"b\",c'b'\n1,2,3".to_string();
+    println!("text: {:?}", text);
+    let result = csv_parser.parse(text);
     match result {
         Ok(data) => data
             .rows
             .iter()
-            .for_each(|row| println!("{:?}", row.get("cb".to_string()))),
+            .for_each(|row| println!("column cb: {:?}", row.get("cb".to_string()))),
         Err(e) => println!("Error: {:?}", e),
     }
 }
