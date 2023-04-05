@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! state_machine {
     (
-        $name:ident($data:ident);
+        $name:ident$(<$($lt:lifetime),*>)?($data:ident$(<$($lt_data:lifetime),*>)?);
         $(
             $state_name:ident {
                 $($event:ident => $possible_target_state:ident),*
@@ -20,10 +20,10 @@ macro_rules! state_machine {
                 Invalid(String),
                 End
             }
-            #[derive(Debug, Clone, PartialEq, Default)]
-            pub struct $name {
+            #[derive(Debug, Clone, Default)]
+            pub struct $name$(<$($lt),*>)? {
                 pub state: State,
-                pub data: $data,
+                pub data: $data$(<$($lt_data),*>)?,
             }
             enum Events {
             $(
@@ -48,7 +48,7 @@ macro_rules! state_machine {
                     fn impossible(&mut self);
                 }
             )*
-            impl $name {
+            impl$(<$($lt),*>)? $name$(<$($lt),*>)? {
                 pub fn run(&mut self) -> Result<$data, String> {
                     loop {
                         match &self.state {

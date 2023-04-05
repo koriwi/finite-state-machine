@@ -1,3 +1,5 @@
+use std::str::Chars;
+
 use finite_state_machine::state_machine;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,20 +29,33 @@ impl CSVRow {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct Data {
-    index: usize,
+#[derive(Debug, Clone)]
+pub struct Data<'a> {
     char: Option<char>,
     quote: Option<char>,
-    text: String,
+    input: Chars<'a>,
     delimiter: char,
     column_names: Vec<String>,
     field_buffer: String,
     rows: Vec<CSVRow>,
 }
 
+impl<'a> Default for Data<'a> {
+    fn default() -> Self {
+        Data {
+            char: None,
+            quote: None,
+            input: "".chars(),
+            delimiter: ',',
+            column_names: Vec::new(),
+            field_buffer: String::new(),
+            rows: Vec::new(),
+        }
+    }
+}
+
 state_machine!(
-    CsvParser(Data);
+    CsvParser<'a>(Data<'a>);
     Start {
         Begin => FindHeaderDelimiter
     },
@@ -70,7 +85,7 @@ state_machine!(
 
 use csv_parser::*;
 
-impl CsvParser {
+impl<'a> CsvParser<'a> {
     fn new(delimiter: char) -> Self {
         let mut parser = CsvParser::default();
         parser.data.delimiter = delimiter;
@@ -100,17 +115,16 @@ impl CsvParser {
         Ok(())
     }
     fn set_next_char(&mut self) {
-        self.data.index += 1;
-        self.data.char = self.data.text.chars().nth(self.data.index);
+        self.data.char = self.data.input.next();
     }
-    fn parse(&mut self, text: String) -> Result<Data, String> {
-        self.data.text = text;
+    fn parse(&mut self, text: &'a String) -> Result<Data, String> {
+        self.data.input = text.chars();
         self.run()?;
         Ok(self.data.clone())
     }
 }
 
-impl FindBodyDelimiterTransitions for CsvParser {
+impl<'a> FindBodyDelimiterTransitions for CsvParser<'a> {
     fn impossible(&mut self) {}
     fn found_new_line(&mut self) -> Result<(), String> {
         let last_row = self.get_last_row()?;
@@ -149,16 +163,16 @@ impl FindBodyDelimiterTransitions for CsvParser {
     }
 }
 
-impl StartTransitions for CsvParser {
+impl<'a> StartTransitions for CsvParser<'a> {
     fn impossible(&mut self) {}
     fn begin(&mut self) -> Result<(), String> {
-        self.data.char = self.data.text.chars().nth(self.data.index);
+        self.data.char = self.data.input.next();
         self.data.column_names = vec![String::new()];
         Ok(())
     }
 }
 
-impl FindBodyRightQuoteTransitions for CsvParser {
+impl<'a> FindBodyRightQuoteTransitions for CsvParser<'a> {
     fn impossible(&mut self) {}
     fn found_right_quote(&mut self) -> Result<(), String> {
         self.data.quote = None;
@@ -172,7 +186,7 @@ impl FindBodyRightQuoteTransitions for CsvParser {
     }
 }
 
-impl FindHeaderDelimiterTransitions for CsvParser {
+impl<'a> FindHeaderDelimiterTransitions for CsvParser<'a> {
     fn impossible(&mut self) {}
     fn found_else(&mut self) -> Result<(), String> {
         let char = self.data.char.ok_or("char cannot disappear".to_string())?;
@@ -202,7 +216,7 @@ impl FindHeaderDelimiterTransitions for CsvParser {
     }
 }
 
-impl FindHeaderRightQuoteTransitions for CsvParser {
+impl<'a> FindHeaderRightQuoteTransitions for CsvParser<'a> {
     fn impossible(&mut self) {}
 
     fn found_else(&mut self) -> Result<(), String> {
@@ -215,7 +229,7 @@ impl FindHeaderRightQuoteTransitions for CsvParser {
     }
 }
 
-impl Deciders for CsvParser {
+impl<'a> Deciders for CsvParser<'a> {
     fn start(&self) -> StartEvents {
         StartEvents::Begin
     }
@@ -280,7 +294,7 @@ fn main() {
     let mut csv_parser = CsvParser::new(',');
     let text = "'a',\"b\",c'b'\n1,2,3".to_string();
     println!("text: {:?}", text);
-    let result = csv_parser.parse(text);
+    let result = csv_parser.parse(&text);
     match result {
         Ok(data) => data
             .rows
