@@ -1,7 +1,7 @@
 use finite_state_machine::state_machine;
 
-#[derive(Debug, Clone, PartialEq)]
-struct Data {
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Data {
     buffer: String,
     quotes: Vec<char>,
     text: String,
@@ -28,6 +28,8 @@ state_machine!(
     }
 );
 
+use quote_parser::*;
+
 impl QuoteParser {
     fn reset(&mut self) {
         self.data.char = None;
@@ -41,18 +43,9 @@ impl QuoteParser {
         self.data.char = self.data.text.chars().nth(self.data.index);
     }
     fn new(quotes: Vec<char>) -> QuoteParser {
-        QuoteParser {
-            data: Data {
-                buffer: String::new(),
-                quotes,
-                text: String::new(),
-                char: None,
-                found: Vec::new(),
-                quote: None,
-                index: 0,
-            },
-            state: State::Start,
-        }
+        let mut machine = QuoteParser::default();
+        machine.data.quotes = quotes;
+        machine
     }
     fn parse(&mut self, text: String) -> Result<Data, String> {
         self.data.text = text;
@@ -60,39 +53,37 @@ impl QuoteParser {
     }
 }
 
-impl Transitions for QuoteParser {
-    fn left_quote_impossible(&mut self) {}
-    fn right_quote_impossible(&mut self) {}
-    fn start_impossible(&mut self) {}
-    fn start_begin(&mut self) -> Result<(), String> {
-        self.data.char = self.data.text.chars().nth(self.data.index);
-        Ok(())
-    }
-    fn left_quote_end_of_text(&mut self) -> Result<(), String> {
+impl LeftQuoteTransitions for QuoteParser {
+    fn impossible(&mut self) {}
+    fn end_of_text(&mut self) -> Result<(), String> {
         self.reset();
         Ok(())
     }
-    fn right_quote_end_of_text(&mut self) -> Result<(), String> {
-        self.reset();
-        Ok(())
-    }
-    fn left_quote_found_quote(&mut self) -> Result<(), String> {
+    fn found_quote(&mut self) -> Result<(), String> {
         self.data.quote = self.data.char;
         self.next_char();
         Ok(())
     }
-    fn left_quote_no_quote(&mut self) -> Result<(), String> {
+    fn no_quote(&mut self) -> Result<(), String> {
         self.next_char();
         Ok(())
     }
-    fn right_quote_found_quote(&mut self) -> Result<(), String> {
+}
+
+impl RightQuoteTransitions for QuoteParser {
+    fn impossible(&mut self) {}
+    fn end_of_text(&mut self) -> Result<(), String> {
+        self.reset();
+        Ok(())
+    }
+    fn found_quote(&mut self) -> Result<(), String> {
         self.data.found.push(self.data.buffer.clone());
         self.data.buffer = String::new();
         self.data.quote = None;
         self.next_char();
         Ok(())
     }
-    fn right_quote_no_quote(&mut self) -> Result<(), String> {
+    fn no_quote(&mut self) -> Result<(), String> {
         let char = self.data.char.ok_or(String::from("char is gone"))?;
         self.data.buffer.push(char);
         self.next_char();
@@ -100,11 +91,19 @@ impl Transitions for QuoteParser {
     }
 }
 
-impl StateActions for QuoteParser {
-    fn run_start(&self) -> StartEvents {
+impl StartTransitions for QuoteParser {
+    fn impossible(&mut self) {}
+    fn begin(&mut self) -> Result<(), String> {
+        self.data.char = self.data.text.chars().nth(self.data.index);
+        Ok(())
+    }
+}
+
+impl Deciders for QuoteParser {
+    fn start(&self) -> StartEvents {
         StartEvents::Begin
     }
-    fn run_left_quote(&self) -> LeftQuoteEvents {
+    fn left_quote(&self) -> LeftQuoteEvents {
         let char = match self.data.char {
             Some(c) => c,
             None => return LeftQuoteEvents::EndOfText,
@@ -114,7 +113,7 @@ impl StateActions for QuoteParser {
             false => LeftQuoteEvents::NoQuote,
         }
     }
-    fn run_right_quote(&self) -> RightQuoteEvents {
+    fn right_quote(&self) -> RightQuoteEvents {
         let quote = match self.data.quote {
             Some(q) => q,
             None => return RightQuoteEvents::Impossible,
