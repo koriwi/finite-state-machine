@@ -47,9 +47,10 @@ impl QuoteParser {
         machine.data.quotes = quotes;
         machine
     }
-    fn parse(&mut self, text: String) -> Result<Data, String> {
+    fn parse(&mut self, text: String) -> Result<Vec<String>, String> {
         self.data.text = text;
-        self.run()
+        self.run()?;
+        Ok(self.data.found.clone())
     }
 }
 
@@ -116,7 +117,7 @@ impl Deciders for QuoteParser {
     fn right_quote(&self) -> RightQuoteEvents {
         let quote = match self.data.quote {
             Some(q) => q,
-            None => return RightQuoteEvents::Impossible,
+            None => return RightQuoteEvents::Illegal,
         };
         let char = match self.data.char {
             Some(c) => c,
@@ -135,7 +136,7 @@ fn main() {
     println!("Finding quoted chars in: {}", input);
     let result = parser.parse(input);
     match result {
-        Ok(data) => println!("Found {:?}", data.found),
+        Ok(data) => println!("Found {:?}", data),
         Err(message) => println!("Error, but found {:?}", message),
     };
 }

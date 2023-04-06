@@ -1,5 +1,5 @@
 use finite_state_machine::state_machine;
-use std::{str::Chars, time::SystemTime};
+use std::{error::Error, str::Chars, time::SystemTime};
 
 type CSVRow = Vec<Option<String>>;
 #[derive(Debug, PartialEq)]
@@ -11,18 +11,18 @@ impl CSVData {
     fn new(column_names: Vec<String>, rows: Vec<CSVRow>) -> Self {
         CSVData { column_names, rows }
     }
-    fn push_column(&mut self, column_name: String) -> Result<(), &str> {
+    fn push_column(&mut self, column_name: String) -> Result<(), String> {
         self.column_names.push(column_name);
         Ok(())
     }
-    fn push_value(&mut self, value: Option<String>) -> Result<(), &str> {
+    fn push_value(&mut self, value: Option<String>) -> Result<(), String> {
         self.rows
             .last_mut()
             .ok_or("last_row is undefined, impossible".to_string())?
             .push(value);
         Ok(())
     }
-    fn add_empty_row(&mut self) -> Result<(), &str> {
+    fn add_empty_row(&mut self) -> Result<(), String> {
         match self.rows.last() {
             Some(row) => {
                 if row.len() != self.column_names.len() {
@@ -30,7 +30,7 @@ impl CSVData {
                         "row length {} does not match column length {}",
                         row.len(),
                         self.column_names.len()
-                    ));
+                    ))?;
                 }
             }
             None => {}
@@ -100,7 +100,7 @@ impl<'a> CsvParser<'a> {
         parser.data.delimiter = delimiter;
         parser
     }
-    fn push_field_as_value_to_row(&mut self) -> Result<(), &str> {
+    fn push_field_as_value_to_row(&mut self) -> Result<(), String> {
         let field = self
             .data
             .field_buffer
@@ -117,7 +117,7 @@ impl<'a> CsvParser<'a> {
             _ => parsed_csv.push_value(Some(trimmed.to_string())),
         }
     }
-    fn push_field_as_value_to_columns(&mut self) -> Result<(), &str> {
+    fn push_field_as_value_to_columns(&mut self) -> Result<(), String> {
         let column = self
             .data
             .field_buffer
@@ -125,7 +125,7 @@ impl<'a> CsvParser<'a> {
             .ok_or("field_buffer is None, impossible".to_string())?;
         let trimmed = column.trim();
         if trimmed.len() == 0 {
-            return Err("column name cannot be empty".to_string());
+            return Err("column name cannot be empty")?;
         }
         self.data
             .parsed_csv
@@ -134,7 +134,7 @@ impl<'a> CsvParser<'a> {
             .push_column(trimmed.to_string())?;
         Ok(())
     }
-    fn add_empty_row(&mut self) -> Result<(), &str> {
+    fn add_empty_row(&mut self) -> Result<(), String> {
         self.data
             .parsed_csv
             .as_mut()
@@ -142,7 +142,7 @@ impl<'a> CsvParser<'a> {
             .add_empty_row()?;
         Ok(())
     }
-    fn store_char_in_field_buffer(&mut self) -> Result<(), &str> {
+    fn store_char_in_field_buffer(&mut self) -> Result<(), String> {
         let char = self.data.char.ok_or("char cannot disappear".to_string())?;
         match self.data.field_buffer {
             Some(ref mut field_buffer) => field_buffer.push(char),
@@ -153,7 +153,7 @@ impl<'a> CsvParser<'a> {
     fn set_next_char(&mut self) {
         self.data.char = self.data.input.next();
     }
-    fn parse(&mut self, text: &'a String) -> Result<Option<CSVData>, String> {
+    fn parse(&mut self, text: &'a String) -> Result<Option<CSVData>, Box<dyn Error>> {
         self.data.input = text.chars();
         self.run()?;
         Ok(self.data.parsed_csv.take())
@@ -162,23 +162,23 @@ impl<'a> CsvParser<'a> {
 
 impl<'a> FindBodyDelimiterTransitions for CsvParser<'a> {
     fn impossible(&mut self) {}
-    fn found_new_line(&mut self) -> Result<(), &str> {
+    fn found_new_line(&mut self) -> Result<(), String> {
         self.push_field_as_value_to_row()?;
         self.add_empty_row()?;
         self.set_next_char();
         Ok(())
     }
-    fn found_else(&mut self) -> Result<(), &str> {
+    fn found_else(&mut self) -> Result<(), String> {
         self.store_char_in_field_buffer()?;
         self.set_next_char();
         Ok(())
     }
-    fn found_delimiter(&mut self) -> Result<(), &str> {
+    fn found_delimiter(&mut self) -> Result<(), String> {
         self.push_field_as_value_to_row()?;
         self.set_next_char();
         Ok(())
     }
-    fn empty(&mut self) -> Result<(), &str> {
+    fn empty(&mut self) -> Result<(), String> {
         match self.data.field_buffer {
             Some(ref field_buffer) => {
                 if field_buffer.len() > 0 {
@@ -189,7 +189,7 @@ impl<'a> FindBodyDelimiterTransitions for CsvParser<'a> {
         }
         Ok(())
     }
-    fn found_left_quote(&mut self) -> Result<(), &str> {
+    fn found_left_quote(&mut self) -> Result<(), String> {
         self.data.quote = self.data.char;
         self.set_next_char();
         Ok(())
@@ -198,7 +198,7 @@ impl<'a> FindBodyDelimiterTransitions for CsvParser<'a> {
 
 impl<'a> StartTransitions for CsvParser<'a> {
     fn impossible(&mut self) {}
-    fn begin(&mut self) -> Result<(), &str> {
+    fn begin(&mut self) -> Result<(), String> {
         self.data.char = self.data.input.next();
         self.data.parsed_csv = Some(CSVData::new(vec![], vec![]));
         Ok(())
@@ -207,12 +207,12 @@ impl<'a> StartTransitions for CsvParser<'a> {
 
 impl<'a> FindBodyRightQuoteTransitions for CsvParser<'a> {
     fn impossible(&mut self) {}
-    fn found_right_quote(&mut self) -> Result<(), &str> {
+    fn found_right_quote(&mut self) -> Result<(), String> {
         self.data.quote = None;
         self.set_next_char();
         Ok(())
     }
-    fn found_else(&mut self) -> Result<(), &str> {
+    fn found_else(&mut self) -> Result<(), String> {
         self.store_char_in_field_buffer()?;
         self.set_next_char();
         Ok(())
@@ -221,25 +221,25 @@ impl<'a> FindBodyRightQuoteTransitions for CsvParser<'a> {
 
 impl<'a> FindHeaderDelimiterTransitions for CsvParser<'a> {
     fn impossible(&mut self) {}
-    fn found_else(&mut self) -> Result<(), &str> {
+    fn found_else(&mut self) -> Result<(), String> {
         self.store_char_in_field_buffer()?;
         self.set_next_char();
         Ok(())
     }
-    fn found_delimiter(&mut self) -> Result<(), &str> {
+    fn found_delimiter(&mut self) -> Result<(), String> {
         self.push_field_as_value_to_columns()?;
         self.set_next_char();
         Ok(())
     }
-    fn empty(&mut self) -> Result<(), &str> {
+    fn empty(&mut self) -> Result<(), String> {
         Ok(())
     }
-    fn found_left_quote(&mut self) -> Result<(), &str> {
+    fn found_left_quote(&mut self) -> Result<(), String> {
         self.data.quote = self.data.char;
         self.set_next_char();
         Ok(())
     }
-    fn found_new_line(&mut self) -> Result<(), &str> {
+    fn found_new_line(&mut self) -> Result<(), String> {
         self.push_field_as_value_to_columns()?;
         self.add_empty_row()?;
         self.set_next_char();
@@ -250,10 +250,10 @@ impl<'a> FindHeaderDelimiterTransitions for CsvParser<'a> {
 impl<'a> FindHeaderRightQuoteTransitions for CsvParser<'a> {
     fn impossible(&mut self) {}
 
-    fn found_else(&mut self) -> Result<(), &str> {
+    fn found_else(&mut self) -> Result<(), String> {
         FindHeaderDelimiterTransitions::found_else(self)
     }
-    fn found_right_quote(&mut self) -> Result<(), &str> {
+    fn found_right_quote(&mut self) -> Result<(), String> {
         self.data.quote = None;
         self.set_next_char();
         Ok(())
@@ -280,11 +280,11 @@ impl<'a> Deciders for CsvParser<'a> {
     fn find_header_right_quote(&self) -> FindHeaderRightQuoteEvents {
         let char = match self.data.char {
             Some(c) => c,
-            None => return FindHeaderRightQuoteEvents::Impossible,
+            None => return FindHeaderRightQuoteEvents::Illegal,
         };
         let quote = match self.data.quote {
             Some(c) => c,
-            None => return FindHeaderRightQuoteEvents::Impossible,
+            None => return FindHeaderRightQuoteEvents::Illegal,
         };
         match char {
             c if c == quote => FindHeaderRightQuoteEvents::FoundRightQuote,
@@ -307,15 +307,15 @@ impl<'a> Deciders for CsvParser<'a> {
     fn find_body_right_quote(&self) -> FindBodyRightQuoteEvents {
         let char = match self.data.char {
             Some(c) => c,
-            None => return FindBodyRightQuoteEvents::Impossible,
+            None => return FindBodyRightQuoteEvents::Illegal,
         };
         let quote = match self.data.quote {
             Some(c) => c,
-            None => return FindBodyRightQuoteEvents::Impossible,
+            None => return FindBodyRightQuoteEvents::Illegal,
         };
         match char {
             c if c == quote => FindBodyRightQuoteEvents::FoundRightQuote,
-            '\n' => FindBodyRightQuoteEvents::Impossible,
+            '\n' => FindBodyRightQuoteEvents::Illegal,
             _ => FindBodyRightQuoteEvents::FoundElse,
         }
     }
@@ -323,7 +323,7 @@ impl<'a> Deciders for CsvParser<'a> {
 
 fn main() {
     let mut csv_parser = CsvParser::new(',');
-    let text = std::fs::read_to_string("very_big.csv").expect("no file");
+    let text = std::fs::read_to_string("./examples/small.csv").expect("no file");
     let now = SystemTime::now();
     let result = csv_parser.parse(&text);
     match result {

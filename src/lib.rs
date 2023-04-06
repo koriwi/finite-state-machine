@@ -11,7 +11,8 @@ macro_rules! state_machine {
         paste::paste!{
         mod [<$name:snake>] {
             use super::*;
-            #[derive(Debug, Clone, PartialEq, Default)]
+            use std::error::Error;
+            #[derive(Debug, Default)]
             pub enum State {
                 #[default]
             $(
@@ -20,7 +21,7 @@ macro_rules! state_machine {
                 Invalid(String),
                 End
             }
-            #[derive(Debug, Clone, Default)]
+            #[derive(Debug, Default)]
             pub struct $name$(<$($lt),*>)? {
                 pub state: State,
                 pub data: $data$(<$($lt_data),*>)?,
@@ -34,7 +35,7 @@ macro_rules! state_machine {
             $(
                 pub enum [<$state_name Events>] {
                     $($event,)*
-                    Impossible
+                    Illegal
                 }
             )*
             pub trait Deciders {
@@ -49,7 +50,7 @@ macro_rules! state_machine {
                 }
             )*
             impl$(<$($lt),*>)? $name$(<$($lt),*>)? {
-                pub fn run(&mut self) -> Result<$data, String> {
+                pub fn run(&mut self) -> Result<(), String> {
                     loop {
                         match &self.state {
                             $(State::$state_name => match self.[<$state_name:snake>]() {
@@ -68,15 +69,15 @@ macro_rules! state_machine {
                                     }
 
                                 },)*
-                                [<$state_name Events>]::Impossible => {
+                                [<$state_name Events>]::Illegal => {
                                     [<$state_name Transitions>]::impossible(self);
                                     #[cfg(feature = "verbose")]
-                                    println!("{} + impossible -> {}", stringify!($state_name), stringify!(Invalid));
-                                    self.state = State::Invalid("impossible".to_owned());
+                                    println!("{} + illegal -> {}", stringify!($state_name), stringify!(Invalid));
+                                    self.state = State::Invalid(Err("illegal")?);
                                 }
                             } ,)*
-                            State::End => return Ok(self.data.clone()),
-                            State::Invalid(message) => return Err(message.to_owned())
+                            State::End => return Ok(()),
+                            State::Invalid(message) => Err(message)?,
                         };
                     };
                 }
