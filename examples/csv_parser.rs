@@ -18,7 +18,7 @@ impl CSVData {
     fn push_value(&mut self, value: Option<String>) -> Result<(), String> {
         self.rows
             .last_mut()
-            .ok_or("last_row is undefined, impossible".to_string())?
+            .ok_or("rows cannot be empty, impossible")?
             .push(value);
         Ok(())
     }
@@ -105,12 +105,12 @@ impl<'a> CsvParser<'a> {
             .data
             .field_buffer
             .take()
-            .ok_or("field_buffer is None, impossible".to_string())?;
+            .ok_or("field_buffer is None, impossible")?;
         let parsed_csv = self
             .data
             .parsed_csv
             .as_mut()
-            .ok_or("parsed_csv is undefined, impossible".to_string())?;
+            .ok_or("parsed_csv is undefined, impossible")?;
         match field.len() {
             0 => parsed_csv.push_value(None),
             _ => parsed_csv.push_value(Some(field)),
@@ -121,28 +121,27 @@ impl<'a> CsvParser<'a> {
             .data
             .field_buffer
             .take()
-            .ok_or("field_buffer is None, impossible".to_string())?;
-        let trimmed = column.trim();
-        if trimmed.len() == 0 {
+            .ok_or("field_buffer is None, impossible")?;
+        if column.len() == 0 {
             return Err("column name cannot be empty")?;
         }
         self.data
             .parsed_csv
             .as_mut()
-            .ok_or("parsed_csv is undefined, impossible".to_string())?
-            .push_column(trimmed.to_string())?;
+            .ok_or("parsed_csv is undefined, impossible")?
+            .push_column(column)?;
         Ok(())
     }
     fn add_empty_row(&mut self) -> Result<(), String> {
         self.data
             .parsed_csv
             .as_mut()
-            .ok_or("parsed_csv is undefined, impossible".to_string())?
+            .ok_or("parsed_csv is undefined, impossible")?
             .add_empty_row()?;
         Ok(())
     }
     fn store_char_in_field_buffer(&mut self) -> Result<(), String> {
-        let char = self.data.char.ok_or("char cannot disappear".to_string())?;
+        let char = self.data.char.ok_or("char cannot disappear")?;
         match self.data.field_buffer {
             Some(ref mut field_buffer) => field_buffer.push(char),
             None => self.data.field_buffer = Some(char.to_string()),
