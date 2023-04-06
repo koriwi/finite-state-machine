@@ -106,15 +106,14 @@ impl<'a> CsvParser<'a> {
             .field_buffer
             .take()
             .ok_or("field_buffer is None, impossible".to_string())?;
-        let trimmed = field.trim();
         let parsed_csv = self
             .data
             .parsed_csv
             .as_mut()
             .ok_or("parsed_csv is undefined, impossible".to_string())?;
-        match trimmed.len() {
+        match field.len() {
             0 => parsed_csv.push_value(None),
-            _ => parsed_csv.push_value(Some(trimmed.to_string())),
+            _ => parsed_csv.push_value(Some(field)),
         }
     }
     fn push_field_as_value_to_columns(&mut self) -> Result<(), String> {
