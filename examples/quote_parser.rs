@@ -55,7 +55,7 @@ impl QuoteParser {
 }
 
 impl LeftQuoteTransitions for QuoteParser {
-    fn impossible(&mut self) {}
+    fn illegal(&mut self) {}
     fn end_of_text(&mut self) -> Result<(), String> {
         self.reset();
         Ok(())
@@ -72,7 +72,7 @@ impl LeftQuoteTransitions for QuoteParser {
 }
 
 impl RightQuoteTransitions for QuoteParser {
-    fn impossible(&mut self) {}
+    fn illegal(&mut self) {}
     fn end_of_text(&mut self) -> Result<(), String> {
         self.reset();
         Ok(())
@@ -93,7 +93,7 @@ impl RightQuoteTransitions for QuoteParser {
 }
 
 impl StartTransitions for QuoteParser {
-    fn impossible(&mut self) {}
+    fn illegal(&mut self) {}
     fn begin(&mut self) -> Result<(), String> {
         self.data.char = self.data.text.chars().nth(self.data.index);
         Ok(())

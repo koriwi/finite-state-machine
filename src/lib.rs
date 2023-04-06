@@ -46,7 +46,7 @@ macro_rules! state_machine {
             $(
                 pub trait [<$state_name Transitions>] {
                     $(fn [<$event:snake>](&mut self) -> Result<(),String>;)*
-                    fn impossible(&mut self);
+                    fn illegal(&mut self);
                 }
             )*
             impl$(<$($lt),*>)? $name$(<$($lt),*>)? {
@@ -70,7 +70,7 @@ macro_rules! state_machine {
 
                                 },)*
                                 [<$state_name Events>]::Illegal => {
-                                    [<$state_name Transitions>]::impossible(self);
+                                    [<$state_name Transitions>]::illegal(self);
                                     #[cfg(feature = "verbose")]
                                     println!("{} + illegal -> {}", stringify!($state_name), stringify!(Invalid));
                                     self.state = State::Invalid(Err("illegal")?);
