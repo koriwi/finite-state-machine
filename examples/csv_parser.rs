@@ -78,48 +78,10 @@ state_machine!(
 
 use csv_parser::*;
 
-impl<'a> FindBodyDelimiterTransitions for CsvParser<'a> {
-    fn illegal(&mut self) {}
-    fn found_new_line(&mut self) -> Result<(), String> {
-        self.push_field_as_value_to_row()?;
-        self.add_empty_row()?;
-        Ok(())
-    }
-    fn found_else(&mut self) -> Result<(), String> {
-        self.store_char()?;
-        Ok(())
-    }
-    fn found_delimiter(&mut self) -> Result<(), String> {
-        self.push_field_as_value_to_row()?;
-        Ok(())
-    }
-    fn empty(&mut self) -> Result<(), String> {
-        Ok(())
-    }
-    fn found_left_quote(&mut self) -> Result<(), String> {
-        self.set_quote()?;
-        self.store_char()?;
-        Ok(())
-    }
-}
-
 impl<'a> StartTransitions for CsvParser<'a> {
     fn illegal(&mut self) {}
     fn begin(&mut self) -> Result<(), String> {
         self.data.parsed_csv = Some(CSVData::new(vec![], vec![]));
-        Ok(())
-    }
-}
-
-impl<'a> FindBodyRightQuoteTransitions for CsvParser<'a> {
-    fn illegal(&mut self) {}
-    fn found_right_quote(&mut self) -> Result<(), String> {
-        self.data.quote = None;
-        self.store_char()?;
-        Ok(())
-    }
-    fn found_else(&mut self) -> Result<(), String> {
-        self.store_char()?;
         Ok(())
     }
 }
@@ -131,7 +93,7 @@ impl<'a> FindHeaderDelimiterTransitions for CsvParser<'a> {
         Ok(())
     }
     fn found_delimiter(&mut self) -> Result<(), String> {
-        self.push_field_as_value_to_columns()?;
+        self.store_cs_value(true)?;
         Ok(())
     }
     fn empty(&mut self) -> Result<(), String> {
@@ -143,7 +105,7 @@ impl<'a> FindHeaderDelimiterTransitions for CsvParser<'a> {
         Ok(())
     }
     fn found_new_line(&mut self) -> Result<(), String> {
-        self.push_field_as_value_to_columns()?;
+        self.store_cs_value(true)?;
         self.add_empty_row()?;
         Ok(())
     }
@@ -156,6 +118,44 @@ impl<'a> FindHeaderRightQuoteTransitions for CsvParser<'a> {
         FindHeaderDelimiterTransitions::found_else(self)
     }
     fn found_right_quote(&mut self) -> Result<(), String> {
+        self.store_char()?;
+        Ok(())
+    }
+}
+
+impl<'a> FindBodyDelimiterTransitions for CsvParser<'a> {
+    fn illegal(&mut self) {}
+    fn found_new_line(&mut self) -> Result<(), String> {
+        self.store_cs_value(false)?;
+        self.add_empty_row()?;
+        Ok(())
+    }
+    fn found_else(&mut self) -> Result<(), String> {
+        self.store_char()?;
+        Ok(())
+    }
+    fn found_delimiter(&mut self) -> Result<(), String> {
+        self.store_cs_value(false)?;
+        Ok(())
+    }
+    fn empty(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+    fn found_left_quote(&mut self) -> Result<(), String> {
+        self.set_quote()?;
+        self.store_char()?;
+        Ok(())
+    }
+}
+
+impl<'a> FindBodyRightQuoteTransitions for CsvParser<'a> {
+    fn illegal(&mut self) {}
+    fn found_right_quote(&mut self) -> Result<(), String> {
+        self.data.quote = None;
+        self.store_char()?;
+        Ok(())
+    }
+    fn found_else(&mut self) -> Result<(), String> {
         self.store_char()?;
         Ok(())
     }
@@ -229,38 +229,29 @@ impl<'a> CsvParser<'a> {
         parser.data.trim_quotes = trim_quotes;
         parser
     }
-    fn push_field_as_value_to_row(&mut self) -> Result<(), String> {
-        let field = &self.data.input.ok_or("input is empty")?[..self.data.index];
-        let field = match self.data.trim_quotes {
-            true => field.trim_matches('"').trim_matches('\''),
-            false => field,
+    fn store_cs_value(&mut self, is_header: bool) -> Result<(), String> {
+        let value = &self.data.input.ok_or("input is empty")?[..self.data.index];
+        let value = match self.data.trim_quotes {
+            true => value.trim_matches('"').trim_matches('\''),
+            false => value,
         };
         let parsed_csv = self
             .data
             .parsed_csv
             .as_mut()
             .ok_or("parsed_csv is undefined, impossible")?;
-        match field.len() {
-            0 => parsed_csv.push_value(None),
-            _ => parsed_csv.push_value(Some(field)),
-        }?;
-        self.skip_char_and_set_start()?;
-        Ok(())
-    }
-    fn push_field_as_value_to_columns(&mut self) -> Result<(), String> {
-        let column = &self.data.input.ok_or("input is empty")?[..self.data.index];
-        let column = match self.data.trim_quotes {
-            true => column.trim_matches('"').trim_matches('\''),
-            false => column,
+        if is_header {
+            if value.is_empty() {
+                return Err("value cannot be empty in header")?;
+            }
+            parsed_csv.push_column(value)?;
+        } else {
+            if value.is_empty() {
+                parsed_csv.push_value(None)?;
+            } else {
+                parsed_csv.push_value(Some(value))?;
+            }
         };
-        if column.is_empty() {
-            return Err("column name cannot be empty")?;
-        }
-        self.data
-            .parsed_csv
-            .as_mut()
-            .ok_or("parsed_csv is undefined, impossible")?
-            .push_column(column)?;
         self.skip_char_and_set_start()?;
         Ok(())
     }

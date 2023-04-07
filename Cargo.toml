@@ -6,5 +6,10 @@ edition = "2021"
 [features]
 verbose = []
 
+# [profile.release]
+# debug = 1
+# [rust]
+# debuginfo-level = 1
+
 [dependencies]
 paste = "1.0.12"
