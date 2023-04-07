@@ -32,7 +32,7 @@ impl<'a> CSVData<'a> {
                 ));
             }
         }
-        self.rows.push(vec![]);
+        self.rows.push(Vec::with_capacity(self.column_names.len()));
         Ok(())
     }
 }
@@ -81,7 +81,14 @@ use csv_parser::*;
 impl<'a> StartTransitions for CsvParser<'a> {
     fn illegal(&mut self) {}
     fn begin(&mut self) -> Result<(), String> {
-        self.data.parsed_csv = Some(CSVData::new(vec![], vec![]));
+        let lines = self
+            .data
+            .input
+            .ok_or("input cannot be empty")?
+            .chars()
+            .take_while(|ch| ch.is_whitespace() && *ch != '\n')
+            .count();
+        self.data.parsed_csv = Some(CSVData::new(vec![], Vec::with_capacity(lines)));
         Ok(())
     }
 }
