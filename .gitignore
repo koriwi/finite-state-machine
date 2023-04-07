@@ -1,1 +1,7 @@
 /target
+callgrind*
+flamegraph.svg
+gen.mjs
+perf.data*
+*.csv
+!small.csv
