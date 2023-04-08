@@ -1,3 +1,4 @@
+pub use paste::paste;
 #[macro_export]
 macro_rules! state_machine {
     (
@@ -8,7 +9,7 @@ macro_rules! state_machine {
             }
         ),*
     ) => {
-        paste::paste!{
+        $crate::paste!{
         mod [<$name:snake>] {
             use super::*;
             use std::error::Error;
