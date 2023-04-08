@@ -51,8 +51,13 @@ macro_rules! state_machine {
                 }
             )*
             impl$(<$($lt),*>)? $name$(<$($lt),*>)? {
+                fn debug(&self) {
+                    println!("debug: {:?}", self.data);
+                }
                 pub fn run(&mut self) -> Result<(), String> {
                     loop {
+                        #[cfg(feature = "verbose")]
+                        println!("Debug: {:?}", self.data);
                         match &self.state {
                             $(State::$state_name => match self.[<$state_name:snake>]() {
                                 $([<$state_name Events>]::$event => {
