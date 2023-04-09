@@ -1,6 +1,5 @@
-use std::fmt;
-
 use finite_state_machine::state_machine;
+use std::fmt;
 
 #[derive(Default)]
 pub struct Data<'a> {
@@ -9,6 +8,57 @@ pub struct Data<'a> {
     quotes: Vec<char>,
     text: Option<&'a str>,
     quote: Option<char>,
+}
+
+impl<'a> Data<'a> {
+    fn include_char(&mut self) -> Result<(), String> {
+        self.index += 1;
+        Ok(())
+    }
+    fn reset_index(&mut self) -> Result<(), String> {
+        self.text = match self.text {
+            Some(text) => Some(&text[self.index..]),
+            None => Err("text is empty")?,
+        };
+        self.index = 0;
+        Ok(())
+    }
+    fn skip_char(&mut self) -> Result<(), String> {
+        if self.index != 0 {
+            Err("index is not null, illegal")?
+        }
+        self.text = match self.text {
+            Some(text) => Some(&text[1..]),
+            None => Err("text is empty")?,
+        };
+        Ok(())
+    }
+    fn set_quote(&mut self) -> Result<(), String> {
+        if self.index != 0 {
+            Err("index is not null, illegal")?
+        }
+        let quote = match self.text {
+            Some(text) => text.as_bytes()[self.index],
+            None => Err("text is empty, illegal")?,
+        };
+        self.quote = Some(quote as char);
+        self.skip_char()?;
+        Ok(())
+    }
+    fn store_included_chars(&mut self) -> Result<(), String> {
+        let quoted = match self.text {
+            Some(text) => &text[..self.index],
+            None => Err("text is empty")?,
+        };
+        match self.found.as_mut() {
+            Some(found) => found.push(quoted),
+            None => {
+                self.found = Some(vec![quoted]);
+            }
+        };
+        self.reset_index()?;
+        Ok(())
+    }
 }
 
 impl<'a> fmt::Debug for Data<'a> {
@@ -50,54 +100,6 @@ state_machine!(
 use quote_parser::*;
 
 impl<'a> QuoteParser<'a> {
-    fn include_char(&mut self) -> Result<(), String> {
-        self.data.index += 1;
-        Ok(())
-    }
-    fn reset_index(&mut self) -> Result<(), String> {
-        self.data.text = match self.data.text {
-            Some(text) => Some(&text[self.data.index..]),
-            None => Err("text is empty")?,
-        };
-        self.data.index = 0;
-        Ok(())
-    }
-    fn skip_char(&mut self) -> Result<(), String> {
-        if self.data.index != 0 {
-            Err("index is not null, illegal")?
-        }
-        self.data.text = match self.data.text {
-            Some(text) => Some(&text[1..]),
-            None => Err("text is empty")?,
-        };
-        Ok(())
-    }
-    fn set_quote(&mut self) -> Result<(), String> {
-        if self.data.index != 0 {
-            Err("index is not null, illegal")?
-        }
-        let quote = match self.data.text {
-            Some(text) => text.as_bytes()[self.data.index],
-            None => Err("text is empty, illegal")?,
-        };
-        self.data.quote = Some(quote as char);
-        self.skip_char()?;
-        Ok(())
-    }
-    fn store_included_chars(&mut self) -> Result<(), String> {
-        let quoted = match self.data.text {
-            Some(text) => &text[..self.data.index],
-            None => Err("text is empty")?,
-        };
-        match self.data.found.as_mut() {
-            Some(found) => found.push(quoted),
-            None => {
-                self.data.found = Some(vec![quoted]);
-            }
-        };
-        self.reset_index()?;
-        Ok(())
-    }
     fn new(quotes: Vec<char>) -> QuoteParser<'a> {
         let mut machine = QuoteParser::default();
         machine.data.quotes = quotes;
@@ -123,11 +125,11 @@ impl<'a> LeftQuoteTransitions for QuoteParser<'a> {
         Ok(())
     }
     fn found_quote(&mut self) -> Result<(), String> {
-        self.set_quote()?;
+        self.data.set_quote()?;
         Ok(())
     }
     fn no_quote(&mut self) -> Result<(), String> {
-        self.skip_char()?;
+        self.data.skip_char()?;
         Ok(())
     }
 }
@@ -138,21 +140,21 @@ impl<'a> RightQuoteTransitions for QuoteParser<'a> {
         Err("unmatched quote")?
     }
     fn found_quote(&mut self) -> Result<(), String> {
-        self.store_included_chars()?;
-        self.skip_char()
+        self.data.store_included_chars()?;
+        self.data.skip_char()
     }
     fn no_quote(&mut self) -> Result<(), String> {
-        self.include_char()
+        self.data.include_char()
     }
     fn found_backslash(&mut self) -> Result<(), String> {
-        self.include_char()
+        self.data.include_char()
     }
 }
 
 impl<'a> EscapeCharTransitions for QuoteParser<'a> {
     fn illegal(&mut self) {}
     fn found_else(&mut self) -> Result<(), String> {
-        self.include_char()
+        self.data.include_char()
     }
 }
 
