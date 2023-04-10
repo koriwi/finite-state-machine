@@ -1,3 +1,4 @@
+#![no_std]
 pub use paste::paste;
 #[macro_export]
 macro_rules! state_machine {
@@ -12,14 +13,13 @@ macro_rules! state_machine {
         $crate::paste!{
         mod [<$name:snake>] {
             use super::*;
-            use std::error::Error;
             #[derive(Debug, Default)]
             pub enum State {
                 #[default]
             $(
                 $state_name,
             )*
-                Invalid(String),
+                Invalid(&'static str),
                 End
             }
             #[derive(Debug, Default)]
@@ -46,7 +46,7 @@ macro_rules! state_machine {
             }
             $(
                 pub trait [<$state_name Transitions>] {
-                    $(fn [<$event:snake>](&mut self) -> Result<(),String>;)*
+                    $(fn [<$event:snake>](&mut self) -> Result<(),&'static str>;)*
                     fn illegal(&mut self);
                 }
             )*
@@ -54,7 +54,7 @@ macro_rules! state_machine {
                 fn debug(&self) {
                     println!("debug: {:?}", self.data);
                 }
-                pub fn run(&mut self) -> Result<(), String> {
+                pub fn run(&mut self) -> Result<(), &'static str> {
                     loop {
                         #[cfg(feature = "verbose")]
                         println!("Debug: {:?}", self.data);
@@ -70,7 +70,7 @@ macro_rules! state_machine {
                                         Err(message) => {
                                             #[cfg(feature = "verbose")]
                                             println!("{} + {} + error({}) -> {}", stringify!($state_name), stringify!($event), message, stringify!(Invalid));
-                                            self.state = State::Invalid(message);
+                                            self.state = State::Invalid(message)
                                         }
                                     }
 
@@ -79,11 +79,11 @@ macro_rules! state_machine {
                                     [<$state_name Transitions>]::illegal(self);
                                     #[cfg(feature = "verbose")]
                                     println!("{} + illegal -> {}", stringify!($state_name), stringify!(Invalid));
-                                    self.state = State::Invalid(Err("illegal")?);
+                                    self.state = State::Invalid("invalid");
                                 }
                             } ,)*
                             State::End => return Ok(()),
-                            State::Invalid(message) => Err(message)?,
+                            State::Invalid(message) => return Err(message),
                         };
                     };
                 }
