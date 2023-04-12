@@ -1,5 +1,7 @@
 [package]
 name = "finite-state-machine"
+description = "A type and trait based finite state machine macro"
+license = "MIT"
 version = "0.1.0"
 edition = "2021"
 
