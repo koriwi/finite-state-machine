@@ -23,7 +23,7 @@ macro_rules! state_machine {
                 End
             }
             #[cfg_attr(feature = "verbose", derive(Debug))]
-            #[derive(Default)]
+            #[cfg_attr(feature = "derive_default", derive(Default))]
             pub struct $name$(<$($lt),*>)? {
                 pub state: State,
                 pub data: $data$(<$($lt_data),*>)?,
