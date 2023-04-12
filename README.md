@@ -1,19 +1,20 @@
 # Finite state machine
 
-Create finite state machines in rust with macros. The macro generates a struct, even enums and traits and also a decider trait. The decider trait is used to decide which state to transition to. Each state has a function which is called automatically when the state is entered. And invalid state and an end state are automatically added. You also need to implement a function for each transition. The macro automatically generates traits for everything you need to implement so the validity is checked on compile time.
+Create finite state machines in rust with macros. The macro generates a struct, event enums and traits and also a decider trait. The decider trait is used to decide which state to transition to. Each state has a function which is called automatically when the state is entered. An invalid state and an end state are automatically added. You also need to implement a function for each transition. The macro automatically generates traits for everything you need to implement so the validity is checked on compile time.
 
 ## Usage
 
 ```rust
 use finite_state_machine::state_machine;
 // Debug is only needed if the verbose feature is enabled
-#[derive(Debug, Default)] struct Data {
+#[derive(Debug, Default)]
+struct Data {
     ...
 }
 state_machine!(
-    // The name of the state machine and the type of the data, you can also use live times here
+    // The name of the state machine and the type of the data, you can also use livetimes here
     CircuitBreaker(Data);
-    // the first state will automatically made the start state, no matter the name
+    // the first state will automatically become the start state, no matter the name
     Closed {
         Ok => Closed, // on Ok event go to Closed state
         AmperageTooHigh => Open // on AmperageTooHigh event go to open state
@@ -31,7 +32,7 @@ state_machine!(
 
 use circuit_breaker::*;
 
-// now you need to implement the decider trait which emits event which decide which state to transition to
+// now you need to implement the decider trait which emits events which decide which state to transition to
 impl Deciders for CircuitBreaker {
     fn closed(&self) -> circuit_breaker::ClosedEvents {
         if self.data.current_amperage > self.data.max_amperage {
