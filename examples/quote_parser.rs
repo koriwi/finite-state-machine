@@ -165,7 +165,7 @@ impl<'a> Deciders for QuoteParser<'a> {
     fn left_quote(&self) -> LeftQuoteEvents {
         let char = match self.data.text {
             Some(text) => text.as_bytes().get(self.data.index),
-            None => return LeftQuoteEvents::Illegal,
+            None => return LeftQuoteEvents::Illegal("text is empty"),
         };
         match char {
             Some(c) if self.data.quotes.contains(&(*c as char)) => LeftQuoteEvents::FoundQuote,
@@ -176,11 +176,11 @@ impl<'a> Deciders for QuoteParser<'a> {
     fn right_quote(&self) -> RightQuoteEvents {
         let quote = match self.data.quote {
             Some(q) => q,
-            None => return RightQuoteEvents::Illegal,
+            None => return RightQuoteEvents::Illegal("quote is empty"),
         };
         let char = match self.data.text {
             Some(text) => text.as_bytes().get(self.data.index),
-            None => return RightQuoteEvents::Illegal,
+            None => return RightQuoteEvents::Illegal("text is empty"),
         };
         match char {
             Some(c) if &(quote as u8) == c => RightQuoteEvents::FoundQuote,
@@ -192,11 +192,11 @@ impl<'a> Deciders for QuoteParser<'a> {
     fn escape_char(&self) -> EscapeCharEvents {
         let char = match self.data.text {
             Some(text) => text.as_bytes().get(self.data.index),
-            None => return EscapeCharEvents::Illegal,
+            None => return EscapeCharEvents::Illegal("text is empty"),
         };
         match char {
             Some(_) => EscapeCharEvents::FoundElse,
-            None => EscapeCharEvents::Illegal,
+            None => EscapeCharEvents::Illegal("char is empty after escape character"),
         }
     }
 }

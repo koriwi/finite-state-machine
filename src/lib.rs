@@ -36,7 +36,7 @@ macro_rules! state_machine {
             $(
                 pub enum [<$state_name Events>] {
                     $($event,)*
-                    Illegal
+                    Illegal(&'static str)
                 }
             )*
             pub trait Deciders {
@@ -75,11 +75,11 @@ macro_rules! state_machine {
                                     }
 
                                 },)*
-                                [<$state_name Events>]::Illegal => {
+                                [<$state_name Events>]::Illegal(message) => {
                                     [<$state_name Transitions>]::illegal(self);
                                     #[cfg(feature = "verbose")]
-                                    println!("{} + illegal -> {}", stringify!($state_name), stringify!(Invalid));
-                                    self.state = State::Invalid("invalid");
+                                    println!("{} + illegal -> invalid({})", stringify!($state_name), stringify!(message));
+                                    self.state = State::Invalid(message);
                                 }
                             } ,)*
                             State::End => return Ok(()),
