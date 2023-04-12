@@ -77,7 +77,7 @@ impl<'a> fmt::Debug for Data<'a> {
 }
 
 state_machine!(
-    QuoteParser<'a>(Data<'a>);
+    QuoteParser(Data<'a>);
     Start {
         Begin => LeftQuote
     },

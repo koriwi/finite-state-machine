@@ -3,7 +3,7 @@ pub use paste::paste;
 #[macro_export]
 macro_rules! state_machine {
     (
-        $name:ident$(<$($lt:lifetime),*>)?($data:ident$(<$($lt_data:lifetime),*>)?);
+        $name:ident($data:ident$(<$($lt:lifetime),*>)?);
         $(
             $state_name:ident {
                 $($event:ident => $possible_target_state:ident),*
@@ -26,7 +26,7 @@ macro_rules! state_machine {
             #[cfg_attr(feature = "derive_default", derive(Default))]
             pub struct $name$(<$($lt),*>)? {
                 pub state: State,
-                pub data: $data$(<$($lt_data),*>)?,
+                pub data: $data$(<$($lt),*>)?,
             }
             enum Events {
             $(

@@ -1,7 +1,7 @@
 use std::time::{Duration, SystemTime};
 
+use circuit_breaker::*;
 use finite_state_machine::state_machine;
-
 #[derive(Debug, Default)]
 pub struct Data {
     max_amperage: u8,
@@ -29,7 +29,6 @@ state_machine!(
     }
 );
 
-use circuit_breaker::*;
 impl Deciders for CircuitBreaker {
     fn closed(&self) -> circuit_breaker::ClosedEvents {
         if self.data.current_amperage > self.data.max_amperage {
