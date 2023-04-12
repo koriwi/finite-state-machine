@@ -22,7 +22,8 @@ macro_rules! state_machine {
                 Invalid(&'static str),
                 End
             }
-            #[derive(Debug, Default)]
+            #[cfg_attr(feature = "verbose", derive(Debug))]
+            #[derive(Default)]
             pub struct $name$(<$($lt),*>)? {
                 pub state: State,
                 pub data: $data$(<$($lt_data),*>)?,
@@ -51,10 +52,7 @@ macro_rules! state_machine {
                 }
             )*
             impl$(<$($lt),*>)? $name$(<$($lt),*>)? {
-                fn debug(&self) {
-                    println!("debug: {:?}", self.data);
-                }
-                pub fn run(&mut self) -> Result<(), &'static str> {
+                pub fn run_to_end(&mut self) -> Result<(), &'static str> {
                     loop {
                         #[cfg(feature = "verbose")]
                         println!("Debug: {:?}", self.data);

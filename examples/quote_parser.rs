@@ -107,7 +107,7 @@ impl<'a> QuoteParser<'a> {
     }
     fn parse(&mut self, text: &'a String) -> Result<Option<Vec<&str>>, &'static str> {
         self.data.text = Some(text);
-        self.run()?;
+        self.run_to_end()?;
         Ok(self.data.found.take())
     }
 }
