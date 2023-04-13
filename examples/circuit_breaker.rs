@@ -8,8 +8,8 @@ pub struct Data {
     current_amperage: u8,
     tripped_at: Option<SystemTime>,
     reset_at: Option<SystemTime>,
-    attemps: u8,
-    max_attemps: u8,
+    attempts: u8,
+    max_attempts: u8,
     cool_down_time: u8,
 }
 state_machine!(
@@ -20,12 +20,12 @@ state_machine!(
     },
     Open {
         AttemptReset => HalfOpen,
-        Wait => Open
+        Wait => Open,
+        MaxAttemptsExceeded => End
     },
     HalfOpen {
         Success => Closed,
-        AmperageTooHigh => Open,
-        MaxAttemps => End
+        AmperageTooHigh => Open
     }
 );
 
@@ -42,10 +42,6 @@ impl Deciders for CircuitBreaker {
             return HalfOpenEvents::Illegal("reset time not set");
         }
 
-        if self.data.attemps > self.data.max_attemps {
-            return HalfOpenEvents::MaxAttemps;
-        }
-
         if self.data.current_amperage > self.data.max_amperage {
             HalfOpenEvents::AmperageTooHigh
         } else {
@@ -53,6 +49,9 @@ impl Deciders for CircuitBreaker {
         }
     }
     fn open(&self) -> OpenEvents {
+        if self.data.attempts == self.data.max_attempts {
+            return OpenEvents::MaxAttemptsExceeded;
+        }
         let now = SystemTime::now();
         let tripped_at = match self.data.tripped_at {
             Some(t) => t,
@@ -83,15 +82,11 @@ impl ClosedTransitions for CircuitBreaker {
 impl HalfOpenTransitions for CircuitBreaker {
     fn success(&mut self) -> Result<(), &'static str> {
         self.data.reset_at = Some(SystemTime::now());
-        self.data.attemps = 0;
+        self.data.attempts = 0;
         Ok(())
     }
     fn amperage_too_high(&mut self) -> Result<(), &'static str> {
         self.data.tripped_at = Some(SystemTime::now());
-        self.data.attemps += 1;
-        Ok(())
-    }
-    fn max_attemps(&mut self) -> Result<(), &'static str> {
         Ok(())
     }
     fn illegal(&mut self) {}
@@ -100,6 +95,10 @@ impl HalfOpenTransitions for CircuitBreaker {
 impl OpenTransitions for CircuitBreaker {
     fn attempt_reset(&mut self) -> Result<(), &'static str> {
         self.data.reset_at = Some(SystemTime::now());
+        self.data.attempts += 1;
+        Ok(())
+    }
+    fn max_attempts_exceeded(&mut self) -> Result<(), &'static str> {
         Ok(())
     }
     fn wait(&mut self) -> Result<(), &'static str> {
@@ -115,6 +114,7 @@ impl CircuitBreaker {
         self.data.current_amperage = 5;
         self.data.max_amperage = 20;
         self.data.cool_down_time = 5;
+        self.data.max_attempts = 3;
         self.run_to_end()
     }
 }
