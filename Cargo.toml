@@ -1,8 +1,9 @@
 [package]
 name = "finite-state-machine"
 description = "A type and trait based finite state machine macro"
+repository = "https://github.com/koriwi/finite-state-machine"
 license = "MIT"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 
 [features]
