@@ -6,7 +6,7 @@ use finite_state_machine::state_machine;
 pub struct Config {
     max_amperage: u8,
     max_attempts: u8,
-    cool_down_time: u8,
+    cool_down_time: Duration,
 }
 
 #[derive(Debug, Default)]
@@ -17,7 +17,7 @@ pub struct Data {
     attempts: u8,
 }
 state_machine!(
-    CircuitBreaker<Config, Data>; // The name of the state machine and the type of the data, you can also use live times here
+    CircuitBreaker(Config, Data); // The name of the state machine and the type of the (), you can also use live times here
     Closed { // the first state will automatically made the start state, no matter the name
         Ok => Closed, // ok Ok event go to Closed state
         AmperageTooHigh => Open // on AmperageTooHigh event go to open state
@@ -33,7 +33,7 @@ state_machine!(
     }
 );
 
-impl Deciders for CircuitBreaker {
+impl Deciders<Data> for CircuitBreaker {
     fn closed(&self, data: &Data) -> circuit_breaker::ClosedEvents {
         if data.current_amperage > self.config.max_amperage {
             circuit_breaker::ClosedEvents::AmperageTooHigh
@@ -62,7 +62,7 @@ impl Deciders for CircuitBreaker {
             None => return OpenEvents::Illegal("tripped_at not set"),
         };
         let diff = now.duration_since(tripped_at).unwrap();
-        if diff.as_secs() < self.config.cool_down_time as u64 {
+        if diff < self.config.cool_down_time {
             OpenEvents::Wait
         } else {
             OpenEvents::AttemptReset
@@ -70,75 +70,57 @@ impl Deciders for CircuitBreaker {
     }
 }
 
-impl ClosedTransitions for CircuitBreaker {
-    fn amperage_too_high(&mut self, mut data: Data) -> Result<Data, &'static str> {
+impl ClosedTransitions<Data> for CircuitBreaker {
+    fn amperage_too_high(&mut self, data: &mut Data) -> Result<(), &'static str> {
         data.tripped_at = Some(SystemTime::now());
-        Ok(data)
+        Ok(())
     }
-    fn ok(&mut self, mut data: Data) -> Result<Data, &'static str> {
+    fn ok(&mut self, data: &mut Data) -> Result<(), &'static str> {
         data.current_amperage += 1;
         std::thread::sleep(Duration::from_millis(500));
-        Ok(data)
+        Ok(())
     }
     fn illegal(&mut self) {}
 }
 
-impl HalfOpenTransitions for CircuitBreaker {
-    fn success(&mut self, mut data: Data) -> Result<Data, &'static str> {
+impl HalfOpenTransitions<Data> for CircuitBreaker {
+    fn success(&mut self, data: &mut Data) -> Result<(), &'static str> {
         data.reset_at = Some(SystemTime::now());
         data.attempts = 0;
-        Ok(data)
+        Ok(())
     }
-    fn amperage_too_high(&mut self, mut data: Data) -> Result<Data, &'static str> {
+    fn amperage_too_high(&mut self, data: &mut Data) -> Result<(), &'static str> {
         data.tripped_at = Some(SystemTime::now());
-        Ok(data)
+        Ok(())
     }
     fn illegal(&mut self) {}
 }
 
-impl OpenTransitions for CircuitBreaker {
-    fn attempt_reset(&mut self, mut data: Data) -> Result<Data, &'static str> {
+impl OpenTransitions<Data> for CircuitBreaker {
+    fn attempt_reset(&mut self, data: &mut Data) -> Result<(), &'static str> {
         data.reset_at = Some(SystemTime::now());
         data.attempts += 1;
-        Ok(data)
+        Ok(())
     }
-    fn max_attempts_exceeded(&mut self, mut data: Data) -> Result<Data, &'static str> {
-        Ok(data)
+    fn max_attempts_exceeded(&mut self, _data: &mut Data) -> Result<(), &'static str> {
+        Ok(())
     }
-    fn wait(&mut self, mut data: Data) -> Result<Data, &'static str> {
-        // sleep for a second or cooldown time
-        std::thread::sleep(std::time::Duration::from_millis(1000));
-        Ok(data)
+    fn wait(&mut self, _data: &mut Data) -> Result<(), &'static str> {
+        std::thread::sleep(self.config.cool_down_time);
+        Ok(())
     }
     fn illegal(&mut self) {}
 }
-
-// impl<C> CircuitBreaker<C> {
-//     fn new(config: C) -> Self {
-//         Self { config }
-//     }
-//     fn run(&mut self) -> Result<Data, &'static str> {
-//         self.run_to_end(State::Closed(Data {
-//             current_amperage: 0,
-//             tripped_at: None,
-//             reset_at: None,
-//             attempts: 0,
-//         }))
-//     }
-// }
 
 fn main() {
     let mut circuit_breaker = CircuitBreaker {
         config: Config {
             max_amperage: 10,
             max_attempts: 3,
-            cool_down_time: 10,
+            cool_down_time: std::time::Duration::from_millis(2000),
         },
     };
-    circuit_breaker.run_to_end(State::Closed(Data {
-        current_amperage: 0,
-        tripped_at: None,
-        reset_at: None,
-        attempts: 0,
-    }));
+    let mut data = Data::default();
+    circuit_breaker.run_to_end(&mut data).unwrap();
+    println!("data: {:?}", data)
 }

@@ -99,76 +99,75 @@ use quote_parser::*;
 
 impl QuoteParser {
     fn new(quotes: Vec<char>) -> QuoteParser {
-        let machine = QuoteParser {
+        QuoteParser {
             config: Config { quotes },
-        };
-        machine
+        }
     }
     fn parse<'a>(&mut self, text: &'a str) -> Result<Vec<&'a str>, &'static str> {
-        let state_data = Data {
+        let mut state_data = Data {
             index: 0,
             found: vec![],
             text: Some(text),
             quote: None,
         };
 
-        let result = self.run_to_end(state_data)?;
-        Ok(result.found)
+        self.run_to_end(&mut state_data)?;
+        Ok(state_data.found)
     }
 }
 
 impl<'a> StartTransitions<Data<'a>> for QuoteParser {
     fn illegal(&mut self) {}
-    fn begin(&mut self, data: Data<'a>) -> Result<Data<'a>, &'static str> {
-        Ok(data)
+    fn begin(&mut self, _data: &mut Data<'a>) -> Result<(), &'static str> {
+        Ok(())
     }
 }
 
 impl<'a> LeftQuoteTransitions<Data<'a>> for QuoteParser {
     fn illegal(&mut self) {}
-    fn end_of_text(&mut self, mut data: Data<'a>) -> Result<Data<'a>, &'static str> {
-        Ok(data)
+    fn end_of_text(&mut self, _data: &mut Data<'a>) -> Result<(), &'static str> {
+        Ok(())
     }
-    fn found_quote(&mut self, mut data: Data<'a>) -> Result<Data<'a>, &'static str> {
+    fn found_quote(&mut self, data: &mut Data<'a>) -> Result<(), &'static str> {
         data.set_quote()?;
-        Ok(data)
+        Ok(())
     }
-    fn no_quote(&mut self, mut data: Data<'a>) -> Result<Data<'a>, &'static str> {
+    fn no_quote(&mut self, data: &mut Data<'a>) -> Result<(), &'static str> {
         data.skip_char()?;
-        Ok(data)
+        Ok(())
     }
 }
 
 impl<'a> RightQuoteTransitions<Data<'a>> for QuoteParser {
     fn illegal(&mut self) {}
-    fn end_of_text(&mut self, mut data: Data<'a>) -> Result<Data<'a>, &'static str> {
+    fn end_of_text(&mut self, _data: &mut Data<'a>) -> Result<(), &'static str> {
         Err("unmatched quote")?
     }
-    fn found_quote(&mut self, mut data: Data<'a>) -> Result<Data<'a>, &'static str> {
+    fn found_quote(&mut self, data: &mut Data<'a>) -> Result<(), &'static str> {
         data.store_included_chars()?;
-        data.skip_char();
-        Ok(data)
+        data.skip_char()?;
+        Ok(())
     }
-    fn no_quote(&mut self, mut data: Data<'a>) -> Result<Data<'a>, &'static str> {
-        data.include_char();
-        Ok(data)
+    fn no_quote(&mut self, data: &mut Data<'a>) -> Result<(), &'static str> {
+        data.include_char()?;
+        Ok(())
     }
-    fn found_backslash(&mut self, mut data: Data<'a>) -> Result<Data<'a>, &'static str> {
-        data.include_char();
-        Ok(data)
+    fn found_backslash(&mut self, data: &mut Data<'a>) -> Result<(), &'static str> {
+        data.include_char()?;
+        Ok(())
     }
 }
 
 impl<'a> EscapeCharTransitions<Data<'a>> for QuoteParser {
     fn illegal(&mut self) {}
-    fn found_else(&mut self, mut data: Data<'a>) -> Result<Data<'a>, &'static str> {
+    fn found_else(&mut self, data: &mut Data<'a>) -> Result<(), &'static str> {
         data.include_char()?;
-        Ok(data)
+        Ok(())
     }
 }
 
 impl<'a> Deciders<Data<'a>> for QuoteParser {
-    fn start(&self, data: &Data) -> StartEvents {
+    fn start(&self, _data: &Data) -> StartEvents {
         StartEvents::Begin
     }
     fn left_quote(&self, data: &Data) -> LeftQuoteEvents {

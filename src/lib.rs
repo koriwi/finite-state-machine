@@ -41,17 +41,17 @@ macro_rules! state_machine {
             )*
             pub trait Deciders<D> {
             $(
-                fn [<$state_name:snake>]<'z>(&self, data: &D) -> [<$state_name Events>];
+                fn [<$state_name:snake>](&self, data: &D) -> [<$state_name Events>];
             )*
             }
             $(
                 pub trait [<$state_name Transitions>]<D> {
-                    $(fn [<$event:snake>]<'z>(&mut self, data: D) -> Result<D,&'static str>;)*
+                    $(fn [<$event:snake>](&mut self, data: &mut D) -> Result<(),&'static str>;)*
                     fn illegal(&mut self);
                 }
             )*
             impl $name{
-                pub fn run_to_end$(<$($lt),*>)?(&mut self, state_data: &mut $data$(<$($lt),*>)?)  -> Result<$data$(<$($lt),*>)?, &'static str> {
+                pub fn run_to_end$(<$($lt),*>)?(&mut self, state_data: &mut $data$(<$($lt),*>)?)  -> Result<(), &'static str> {
                     let mut state = State::default();
                     loop {
                         match state {
@@ -62,7 +62,6 @@ macro_rules! state_machine {
                                             #[cfg(feature = "verbose")]
                                             println!("{} + {} -> {}", stringify!($state_name), stringify!($event), stringify!($possible_target_state));
                                             state = State::$possible_target_state;
-                                            state_data = data;
                                         },
                                         Err(message) => {
                                             #[cfg(feature = "verbose")]
@@ -79,7 +78,7 @@ macro_rules! state_machine {
                                     state = State::Invalid(message);
                                 }
                             } ,)*
-                            State::End => return Ok(state_data),
+                            State::End => return Ok(()),
                             State::Invalid(message) => return Err(message),
                         };
                     };
