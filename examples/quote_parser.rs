@@ -2,10 +2,13 @@ use finite_state_machine::state_machine;
 use std::fmt;
 
 #[derive(Default)]
+pub struct Config {
+    quotes: Vec<char>,
+}
+
 pub struct Data<'a> {
     index: usize,
-    found: Option<Vec<&'a str>>,
-    quotes: Vec<char>,
+    found: Vec<&'a str>,
     text: Option<&'a str>,
     quote: Option<char>,
 }
@@ -50,12 +53,7 @@ impl<'a> Data<'a> {
             Some(text) => &text[..self.index],
             None => Err("text is empty")?,
         };
-        match self.found.as_mut() {
-            Some(found) => found.push(quoted),
-            None => {
-                self.found = Some(vec![quoted]);
-            }
-        };
+        self.found.push(quoted);
         self.reset_index()?;
         Ok(())
     }
@@ -77,7 +75,7 @@ impl<'a> fmt::Debug for Data<'a> {
 }
 
 state_machine!(
-    QuoteParser(Data<'a>);
+    QuoteParser(Config, Data);
     Start {
         Begin => LeftQuote
     },
@@ -99,87 +97,98 @@ state_machine!(
 
 use quote_parser::*;
 
-impl<'a> QuoteParser<'a> {
-    fn new(quotes: Vec<char>) -> QuoteParser<'a> {
-        let mut machine = QuoteParser::default();
-        machine.data.quotes = quotes;
+impl QuoteParser {
+    fn new(quotes: Vec<char>) -> QuoteParser {
+        let machine = QuoteParser {
+            config: Config { quotes },
+        };
         machine
     }
-    fn parse(&mut self, text: &'a String) -> Result<Option<Vec<&str>>, &'static str> {
-        self.data.text = Some(text);
-        self.run_to_end()?;
-        Ok(self.data.found.take())
+    fn parse<'a>(&mut self, text: &'a str) -> Result<Vec<&'a str>, &'static str> {
+        let state_data = Data {
+            index: 0,
+            found: vec![],
+            text: Some(text),
+            quote: None,
+        };
+
+        let result = self.run_to_end(state_data)?;
+        Ok(result.found)
     }
 }
 
-impl<'a> StartTransitions for QuoteParser<'a> {
+impl<'a> StartTransitions<Data<'a>> for QuoteParser {
     fn illegal(&mut self) {}
-    fn begin(&mut self) -> Result<(), &'static str> {
-        Ok(())
+    fn begin(&mut self, data: Data<'a>) -> Result<Data<'a>, &'static str> {
+        Ok(data)
     }
 }
 
-impl<'a> LeftQuoteTransitions for QuoteParser<'a> {
+impl<'a> LeftQuoteTransitions<Data<'a>> for QuoteParser {
     fn illegal(&mut self) {}
-    fn end_of_text(&mut self) -> Result<(), &'static str> {
-        Ok(())
+    fn end_of_text(&mut self, mut data: Data<'a>) -> Result<Data<'a>, &'static str> {
+        Ok(data)
     }
-    fn found_quote(&mut self) -> Result<(), &'static str> {
-        self.data.set_quote()?;
-        Ok(())
+    fn found_quote(&mut self, mut data: Data<'a>) -> Result<Data<'a>, &'static str> {
+        data.set_quote()?;
+        Ok(data)
     }
-    fn no_quote(&mut self) -> Result<(), &'static str> {
-        self.data.skip_char()?;
-        Ok(())
+    fn no_quote(&mut self, mut data: Data<'a>) -> Result<Data<'a>, &'static str> {
+        data.skip_char()?;
+        Ok(data)
     }
 }
 
-impl<'a> RightQuoteTransitions for QuoteParser<'a> {
+impl<'a> RightQuoteTransitions<Data<'a>> for QuoteParser {
     fn illegal(&mut self) {}
-    fn end_of_text(&mut self) -> Result<(), &'static str> {
+    fn end_of_text(&mut self, mut data: Data<'a>) -> Result<Data<'a>, &'static str> {
         Err("unmatched quote")?
     }
-    fn found_quote(&mut self) -> Result<(), &'static str> {
-        self.data.store_included_chars()?;
-        self.data.skip_char()
+    fn found_quote(&mut self, mut data: Data<'a>) -> Result<Data<'a>, &'static str> {
+        data.store_included_chars()?;
+        data.skip_char();
+        Ok(data)
     }
-    fn no_quote(&mut self) -> Result<(), &'static str> {
-        self.data.include_char()
+    fn no_quote(&mut self, mut data: Data<'a>) -> Result<Data<'a>, &'static str> {
+        data.include_char();
+        Ok(data)
     }
-    fn found_backslash(&mut self) -> Result<(), &'static str> {
-        self.data.include_char()
+    fn found_backslash(&mut self, mut data: Data<'a>) -> Result<Data<'a>, &'static str> {
+        data.include_char();
+        Ok(data)
     }
 }
 
-impl<'a> EscapeCharTransitions for QuoteParser<'a> {
+impl<'a> EscapeCharTransitions<Data<'a>> for QuoteParser {
     fn illegal(&mut self) {}
-    fn found_else(&mut self) -> Result<(), &'static str> {
-        self.data.include_char()
+    fn found_else(&mut self, mut data: Data<'a>) -> Result<Data<'a>, &'static str> {
+        data.include_char()?;
+        Ok(data)
     }
 }
 
-impl<'a> Deciders for QuoteParser<'a> {
-    fn start(&self) -> StartEvents {
+impl<'a> Deciders<Data<'a>> for QuoteParser {
+    fn start(&self, data: &Data) -> StartEvents {
         StartEvents::Begin
     }
-    fn left_quote(&self) -> LeftQuoteEvents {
-        let char = match self.data.text {
-            Some(text) => text.as_bytes().get(self.data.index),
+    fn left_quote(&self, data: &Data) -> LeftQuoteEvents {
+        let char = match data.text {
+            Some(text) => text.as_bytes().get(data.index),
             None => return LeftQuoteEvents::Illegal("text is empty"),
         };
         match char {
-            Some(c) if self.data.quotes.contains(&(*c as char)) => LeftQuoteEvents::FoundQuote,
+            Some(c) if self.config.quotes.contains(&(*c as char)) => LeftQuoteEvents::FoundQuote,
             Some(_) => LeftQuoteEvents::NoQuote,
             None => LeftQuoteEvents::EndOfText,
         }
     }
-    fn right_quote(&self) -> RightQuoteEvents {
-        let quote = match self.data.quote {
+    fn right_quote(&self, data: &Data) -> RightQuoteEvents {
+        let quote = match data.quote {
             Some(q) => q,
             None => return RightQuoteEvents::Illegal("quote is empty"),
         };
-        let char = match self.data.text {
-            Some(text) => text.as_bytes().get(self.data.index),
+        let char = match data.text {
+            Some(text) => text.as_bytes().get(data.index),
             None => return RightQuoteEvents::Illegal("text is empty"),
         };
         match char {
@@ -189,9 +198,9 @@ impl<'a> Deciders for QuoteParser<'a> {
             None => RightQuoteEvents::EndOfText,
         }
     }
-    fn escape_char(&self) -> EscapeCharEvents {
-        let char = match self.data.text {
-            Some(text) => text.as_bytes().get(self.data.index),
+    fn escape_char(&self, data: &Data) -> EscapeCharEvents {
+        let char = match data.text {
+            Some(text) => text.as_bytes().get(data.index),
             None => return EscapeCharEvents::Illegal("text is empty"),
         };
         match char {
@@ -203,17 +212,15 @@ impl<'a> Deciders for QuoteParser<'a> {
 
 fn main() {
     let mut parser = QuoteParser::new(vec!['\'', '"']);
-    let input = "Hello 'World' from \"macro_rules!\". I can even do \"escaped quotes ->\\\"<-\""
-        .to_string();
+    let input = "Hello 'World' from \"macro_rules!\". I can even do \"escaped quotes ->\\\"<-\"";
     println!("Finding quoted chars in: {}", input);
-    let result = parser.parse(&input);
+    let result = parser.parse(input);
     match result {
-        Ok(Some(data)) => {
+        Ok(data) => {
             for entry in data {
                 println!("{}", entry);
             }
         }
-        Ok(None) => println!("Success but found nothing"),
         Err(message) => println!("Error: {:?}", message),
     };
 }

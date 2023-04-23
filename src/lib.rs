@@ -3,7 +3,7 @@ pub use paste::paste;
 #[macro_export]
 macro_rules! state_machine {
     (
-        $name:ident($data:ident$(<$($lt:lifetime),*>)?);
+        $name:ident($config:ident, $data:ident$(<$($lt:lifetime),*>)?);
         $(
             $state_name:ident {
                 $($event:ident => $possible_target_state:ident),*
@@ -13,8 +13,10 @@ macro_rules! state_machine {
         $crate::paste!{
         mod [<$name:snake>] {
             use super::*;
-            #[derive(Debug, Default)]
-            pub enum State {
+
+            #[cfg_attr(feature = "verbose", derive(Debug))]
+            #[derive(Default)]
+            pub enum State$(<$($lt),*>)? {
                 #[default]
             $(
                 $state_name,
@@ -22,11 +24,8 @@ macro_rules! state_machine {
                 Invalid(&'static str),
                 End
             }
-            #[cfg_attr(feature = "verbose", derive(Debug))]
-            #[cfg_attr(feature = "derive_default", derive(Default))]
-            pub struct $name$(<$($lt),*>)? {
-                pub state: State,
-                pub data: $data$(<$($lt),*>)?,
+            pub struct $name {
+                pub config: $config,
             }
             enum Events {
             $(
@@ -40,35 +39,35 @@ macro_rules! state_machine {
                     Illegal(&'static str)
                 }
             )*
-            pub trait Deciders {
+            pub trait Deciders<D> {
             $(
-                fn [<$state_name:snake>](&self) -> [<$state_name Events>];
+                fn [<$state_name:snake>]<'z>(&self, data: &D) -> [<$state_name Events>];
             )*
             }
             $(
-                pub trait [<$state_name Transitions>] {
-                    $(fn [<$event:snake>](&mut self) -> Result<(),&'static str>;)*
+                pub trait [<$state_name Transitions>]<D> {
+                    $(fn [<$event:snake>]<'z>(&mut self, data: D) -> Result<D,&'static str>;)*
                     fn illegal(&mut self);
                 }
             )*
-            impl$(<$($lt),*>)? $name$(<$($lt),*>)? {
-                pub fn run_to_end(&mut self) -> Result<(), &'static str> {
+            impl $name{
+                pub fn run_to_end$(<$($lt),*>)?(&mut self, state_data: &mut $data$(<$($lt),*>)?)  -> Result<$data$(<$($lt),*>)?, &'static str> {
+                    let mut state = State::default();
                     loop {
-                        #[cfg(feature = "verbose")]
-                        println!("Debug: {:?}", self.data);
-                        match &self.state {
-                            $(State::$state_name => match self.[<$state_name:snake>]() {
+                        match state {
+                            $(State::$state_name => match self.[<$state_name:snake>](&state_data) {
                                 $([<$state_name Events>]::$event => {
-                                    match [<$state_name Transitions>]::[<$event:snake>](self) {
-                                        Ok(_) => {
+                                    match [<$state_name Transitions>]::[<$event:snake>](self, state_data) {
+                                        Ok(data) => {
                                             #[cfg(feature = "verbose")]
                                             println!("{} + {} -> {}", stringify!($state_name), stringify!($event), stringify!($possible_target_state));
-                                            self.state = State::$possible_target_state
+                                            state = State::$possible_target_state;
+                                            state_data = data;
                                         },
                                         Err(message) => {
                                             #[cfg(feature = "verbose")]
                                             println!("{} + {} + error({}) -> {}", stringify!($state_name), stringify!($event), message, stringify!(Invalid));
-                                            self.state = State::Invalid(message)
+                                            state = State::Invalid(message)
                                         }
                                     }
 
@@ -77,10 +76,10 @@ macro_rules! state_machine {
                                     [<$state_name Transitions>]::illegal(self);
                                     #[cfg(feature = "verbose")]
                                     println!("{} + illegal -> invalid({})", stringify!($state_name), stringify!(message));
-                                    self.state = State::Invalid(message);
+                                    state = State::Invalid(message);
                                 }
                             } ,)*
-                            State::End => return Ok(()),
+                            State::End => return Ok(state_data),
                             State::Invalid(message) => return Err(message),
                         };
                     };
